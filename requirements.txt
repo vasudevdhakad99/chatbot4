@@ -8,4 +8,6 @@ faiss-cpu
 langchain_google_genai
 langchain-community
 pdfplumber
-openpyxl
+groq
+langchain_groq
+pyodbc
