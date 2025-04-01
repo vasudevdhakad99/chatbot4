@@ -11,3 +11,7 @@ pdfplumber
 groq
 langchain_groq
 pyodbc
+unixodbc
+unixodbc-dev
+odbcinst
+libodbc1
