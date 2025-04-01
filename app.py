@@ -1,5 +1,6 @@
 import streamlit as st
 from PyPDF2 import PdfReader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
 import pandas as pd
 from langchain.vectorstores import FAISS
@@ -11,15 +12,14 @@ from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# File paths
-PDF_DIRECTORY = "E:\\chatbot"  # Update with your PDF directory
+PDF_DIRECTORY = "E:\\chatbot"  # Change this to your desired directory E:\chatbot\Hexa_CompanyprofileCM.pdf
+
 CHAT_HISTORY_FILE = "chat_history.xlsx"  # Excel file for chat storage
 
-# Ensure chat history file exists
+
 if not os.path.exists(CHAT_HISTORY_FILE):
     df = pd.DataFrame(columns=["User ID", "Role", "Message"])
     df.to_excel(CHAT_HISTORY_FILE, index=False)
@@ -38,9 +38,8 @@ def save_chat_history(user_id, chat_history):
 def load_chat_history(user_id):
     df = pd.read_excel(CHAT_HISTORY_FILE)
     user_messages = df[df["User ID"] == user_id][["Role", "Message"]].to_dict("records")
-    return user_messages if not user_messages else []
+    return user_messages if not user_messages else []    
 
-# Function to extract text from PDFs
 def get_pdf_text(pdf_directory):
     text = ""
     for pdf_file in os.listdir(pdf_directory):
@@ -51,49 +50,44 @@ def get_pdf_text(pdf_directory):
                 text += page.extract_text() or ""
     return text
 
-# Function to create and store vector embeddings
-def get_vector_store():
-    raw_text = get_pdf_text(PDF_DIRECTORY)
-    text_chunks = raw_text.split("\n")  # Simple split (or use RecursiveCharacterTextSplitter)
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", dimensions=256)
+def get_text_chunks(text):
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=250)
+    return text_splitter.split_text(text)
+
+
+def get_vector_store(text_chunks):
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001",dimensions=256)
     vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
+    
     return vector_store
 
-# Load or create vector store
-def load_vector_store():
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    if os.path.exists("faiss_index"):
-        return FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
-    else:
-        return get_vector_store()
-
-# Function to set up the conversational AI chain
 def get_conversational_chain():
     prompt_template = """
     Answer the question as detailed as possible from the provided context. If the answer is not in
     the provided context, just say, "Answer is not available in the context."
     
     Context:
-    {context}
+    {context}?
     
     Question: 
     {question}
     
     Answer:
     """
-    model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.3, streaming=True)
+    model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.3,streaming =True)
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
     return load_qa_chain(model, chain_type="stuff", prompt=prompt)
 
-# Function to handle user input
-def user_input(user_question, vector_store):
-    docs = vector_store.similarity_search(user_question)
+def user_input(user_question):
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+    
+    # Perform similarity search
+    docs = new_db.similarity_search(user_question)
     chain = get_conversational_chain()
     response = chain({"input_documents": docs, "question": user_question}, return_only_outputs=True)
     return response["output_text"]
-
-# Main Streamlit App
 def main():
     st.title("Hexa AI Assistant")
 
@@ -114,7 +108,7 @@ def main():
             st.chat_message(role).markdown(message["Message"])
 
         # Load vector store
-        vector_store = load_vector_store()
+
 
         # User input processing
         prompt = st.chat_input("Ask me anything about the PDF...")
@@ -123,7 +117,7 @@ def main():
             st.session_state.messages.append({'Role': 'user', 'Message': prompt})
 
             try:
-                response = user_input(prompt, vector_store)
+                response = user_input(prompt)
                 st.chat_message('assistant').markdown(response)
                 st.session_state.messages.append({'Role': 'assistant', 'Message': response})
 
