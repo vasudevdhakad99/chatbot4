@@ -11,5 +11,5 @@ pdfplumber
 groq
 langchain_groq
 pyodbc
-unixodbc
-upgrade pip
+openpyxl==3.0.10
+
