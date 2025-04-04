@@ -13,6 +13,5 @@ langchain_groq
 pyodbc
 openpyxl==3.1.2
 pandas
-upgrade pip
 langchain_community
 
