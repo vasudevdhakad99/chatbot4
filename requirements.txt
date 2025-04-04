@@ -12,4 +12,5 @@ groq
 langchain_groq
 pyodbc
 openpyxl==3.0.10
+pandas
 
