@@ -14,4 +14,5 @@ pyodbc
 openpyxl==3.1.2
 pandas
 upgrade pip
+from langchain_community.vectorstores import FAISS
 
