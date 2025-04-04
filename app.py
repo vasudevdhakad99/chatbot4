@@ -1,5 +1,4 @@
 import streamlit as st
-import pyodbc 
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
@@ -13,60 +12,32 @@ from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# Database Connection
-def get_db_connection():
-    conn = pyodbc.connect(
-        f"DRIVER={os.getenv('SQL_DRIVER')};"
-        f"SERVER={os.getenv('SQL_SERVER')};"
-        f"DATABASE={os.getenv('SQL_DATABASE')};"
-        f"UID={os.getenv('SQL_USERNAME')};"
-        f"PWD={os.getenv('SQL_PASSWORD')}"
-    )
-    return conn
+PDF_DIRECTORY = "E:\\chatbot"  # Change this to your desired directory E:\chatbot\Hexa_CompanyprofileCM.pdf
 
-# Create the chat history table if it doesn't exist
-def initialize_database():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='chat_history' AND xtype='U')
-        CREATE TABLE chat_history (
-            id int IDENTITY PRIMARY KEY,
-            user_id NVARCHAR(255),
-            role NVARCHAR(250),
-            message NVARCHAR(MAX),
-            timestamp DATETIME DEFAULT GETDATE()
-        )
-    ''')
-    conn.commit()
-    conn.close()
+CHAT_HISTORY_FILE = "chat_history.xlsx"  # Excel file for chat storage
 
-initialize_database()  # Ensure table is created on startup
+if not os.path.exists(CHAT_HISTORY_FILE):
+    df = pd.DataFrame(columns=["User ID", "Role", "Message"])
+    df.to_excel(CHAT_HISTORY_FILE, index=False, engine='openpyxl')  # Specify engine here
 
-# Function to save chat history to SQL Server
+# Function to save chat history
 def save_chat_history(user_id, chat_history):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    for message in chat_history:
-        cursor.execute(
-            "INSERT INTO chat_history (user_id, role, message) VALUES (?, ?, ?)",
-            user_id, message["Role"], message["Message"]
-        )
-    conn.commit()
-    conn.close()
+    df = pd.read_excel(CHAT_HISTORY_FILE, engine='openpyxl')  # Specify engine here
+    new_data = pd.DataFrame([  # Prepare new data to append
+        {"User ID": user_id, "Role": message["Role"], "Message": message["Message"]}
+        for message in chat_history
+    ])
+    df = pd.concat([df, new_data], ignore_index=True)
+    df.to_excel(CHAT_HISTORY_FILE, index=False, engine='openpyxl')  # Specify engine here
 
-# Function to load chat history from SQL Server
+# Function to load chat history
 def load_chat_history(user_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT role, message FROM chat_history WHERE user_id = ? ORDER BY timestamp ASC", (user_id,))
-    messages = [{"Role": row[0], "Message": row[1]} for row in cursor.fetchall()]
-    conn.close()
-    return messages if messages else []
+    df = pd.read_excel(CHAT_HISTORY_FILE, engine='openpyxl')  # Specify engine here
+    user_messages = df[df["User ID"] == user_id][["Role", "Message"]].to_dict("records")
+    return user_messages if user_messages else []
 
 # Function to get PDF text
 def get_pdf_text(pdf_directory):
@@ -139,6 +110,8 @@ def main():
             role = message["Role"].lower()  # Ensure role is lowercase ('user' or 'assistant')
             st.chat_message(role).markdown(message["Message"])
 
+        # Load vector store
+
         # User input processing
         prompt = st.chat_input("Ask me anything about the PDF...")
         if prompt:
@@ -150,7 +123,7 @@ def main():
                 st.chat_message('assistant').markdown(response)
                 st.session_state.messages.append({'Role': 'assistant', 'Message': response})
 
-                # Save chat history to SQL Server
+                # Save chat history to Excel
                 save_chat_history(st.session_state.user_id, st.session_state.messages)
 
             except Exception as e:
@@ -158,3 +131,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
