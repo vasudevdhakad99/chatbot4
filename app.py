@@ -81,7 +81,27 @@ def get_conversational_chain():
     return load_qa_chain(model, chain_type="stuff", prompt=prompt)
 
 # Function to process user input and get a response
+from datetime import datetime
+
+# Function to process user input and get a response
 def user_input(user_question):
+    # Normalize the user input
+    lower_question = user_question.lower().strip()
+
+    # Basic greetings check
+    greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]
+    if any(greet in lower_question for greet in greetings):
+        current_hour = datetime.now().hour
+        if 5 <= current_hour < 12:
+            return "Good morning sir, how may I help you?"
+        elif 12 <= current_hour < 17:
+            return "Good afternoon sir, how may I help you?"
+        elif 17 <= current_hour < 21:
+            return "Good evening sir, how may I help you?"
+        else:
+            return "Hello sir, how may I help you?"
+
+    # If not a greeting, proceed with similarity search
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
     
@@ -90,6 +110,7 @@ def user_input(user_question):
     chain = get_conversational_chain()
     response = chain({"input_documents": docs, "question": user_question}, return_only_outputs=True)
     return response["output_text"]
+
 
 def main():
     st.title("Hexa AI Assistant")
