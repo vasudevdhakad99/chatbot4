@@ -84,13 +84,16 @@ def get_conversational_chain():
 from datetime import datetime
 
 # Function to process user input and get a response
+from datetime import datetime
+
+# Function to process user input and get a response
 def user_input(user_question):
     # Normalize the user input
     lower_question = user_question.lower().strip()
 
     # Basic greetings check
     greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]
-    if any(greet in lower_question for greet in greetings):
+    if any(lower_question == greet for greet in greetings):
         current_hour = datetime.now().hour
         if 5 <= current_hour < 12:
             return "Good morning sir, how may I help you?"
@@ -101,15 +104,15 @@ def user_input(user_question):
         else:
             return "Hello sir, how may I help you?"
 
-    # If not a greeting, proceed with similarity search
+    # If not a greeting, proceed with vector store search
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
     
-    # Perform similarity search
     docs = new_db.similarity_search(user_question)
     chain = get_conversational_chain()
     response = chain({"input_documents": docs, "question": user_question}, return_only_outputs=True)
     return response["output_text"]
+
 
 
 def main():
